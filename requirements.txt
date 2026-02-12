@@ -1,12 +1,12 @@
-# Web Framework
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
+# Web Framework (Python 3.6 compatible - Jetson Nano / JetPack 4.6)
+fastapi==0.83.0
+uvicorn==0.17.6
 
-# Database
-sqlalchemy==2.0.25
+# Database (1.4.x is last branch supporting Python 3.6)
+sqlalchemy==1.4.52
 
 # HTTP Client
-requests==2.31.0
+requests==2.27.1
 
 # Hardware - NVIDIA Jetson Nano GPIO
 # Installed separately by install.sh (requires system-level Jetson libs)
