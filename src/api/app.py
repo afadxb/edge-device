@@ -6,7 +6,6 @@ and exposes a local management API for manual overrides and status.
 """
 import os
 import logging
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -25,12 +24,6 @@ def create_app(event_processor=None, heartbeat_service=None, cloud_sync=None) ->
         cloud_sync: CloudSyncService instance for manual sync triggers
     """
 
-    @asynccontextmanager
-    async def lifespan(app: FastAPI):
-        logger.info("Edge controller API started")
-        yield
-        logger.info("Edge controller API shutting down")
-
     # Disable docs in production unless explicitly enabled
     enable_docs = os.environ.get('EDGE_ENABLE_DOCS', '').lower() in ('1', 'true')
 
@@ -40,8 +33,15 @@ def create_app(event_processor=None, heartbeat_service=None, cloud_sync=None) ->
         version="1.0.0",
         docs_url="/docs" if enable_docs else None,
         redoc_url=None,
-        lifespan=lifespan,
     )
+
+    @app.on_event("startup")
+    async def on_startup():
+        logger.info("Edge controller API started")
+
+    @app.on_event("shutdown")
+    async def on_shutdown():
+        logger.info("Edge controller API shutting down")
 
     # Store services in app state so routes can access them
     app.state.event_processor = event_processor
