@@ -2,12 +2,13 @@
 """
 Register this edge device with the ANPR cloud backend.
 
-Contacts the cloud API to register the device and writes
-the returned controller_id and api_key to config.yaml and .env.
+The controller must already exist in the cloud dashboard.
+This script links the physical device to that controller record
+and writes the returned api_key to config.yaml and .env.
 
 Usage:
-    python scripts/register_device.py --api-url https://api.anpr.cloud
-    python scripts/register_device.py --api-url https://api.anpr.cloud --token <admin-token>
+    python3 register_device.py --api-url http://api.example.com:3000 --controller-id <id>
+    python3 register_device.py --api-url http://api.example.com:3000 --controller-id <id> --token <jwt>
 """
 import argparse
 import getpass
@@ -28,16 +29,31 @@ CONFIG_PATH = os.path.join(INSTALL_DIR, "config", "config.yaml")
 ENV_PATH = os.path.join(INSTALL_DIR, ".env")
 
 
-def get_device_info() -> dict:
+def detect_hardware_type():
+    """Detect hardware platform: PI5, JETSON_NANO, or GENERIC."""
+    try:
+        with open("/proc/device-tree/model", "r") as f:
+            model = f.read().strip().rstrip("\x00").lower()
+            if "jetson" in model:
+                return "JETSON_NANO"
+            if "raspberry" in model:
+                return "PI5"
+    except FileNotFoundError:
+        pass
+    return "GENERIC"
+
+
+def get_device_info():
     """Gather device hardware information for registration."""
     info = {
         "hostname": socket.gethostname(),
         "platform": platform.machine(),
-        "os": f"{platform.system()} {platform.release()}",
-        "python": platform.python_version(),
+        "osVersion": "{} {}".format(platform.system(), platform.release()),
+        "pythonVersion": platform.python_version(),
+        "hardwareType": detect_hardware_type(),
     }
 
-    # Detect hardware model
+    # Detect hardware model (display only)
     try:
         with open("/proc/device-tree/model", "r") as f:
             info["model"] = f.read().strip().rstrip("\x00")
@@ -48,10 +64,20 @@ def get_device_info() -> dict:
     try:
         result = subprocess.run(
             ["cat", "/sys/class/net/eth0/address"],
-            capture_output=True, text=True, timeout=5,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            universal_newlines=True, timeout=5,
         )
         if result.returncode == 0:
-            info["mac_address"] = result.stdout.strip()
+            info["macAddress"] = result.stdout.strip()
+    except Exception:
+        pass
+
+    # Get IP address
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        info["ipAddress"] = s.getsockname()[0]
+        s.close()
     except Exception:
         pass
 
@@ -76,18 +102,20 @@ def authenticate(api_url: str, token: Optional[str]) -> str:
     return resp.json()["accessToken"]
 
 
-def register(api_url: str, auth_token: str, device_info: dict, name: str) -> dict:
+def register(api_url, auth_token, device_info, controller_id):
     """Register the device with the cloud backend."""
+    payload = {
+        "controllerId": controller_id,
+        "hardwareType": device_info["hardwareType"],
+        "osVersion": device_info.get("osVersion"),
+        "pythonVersion": device_info.get("pythonVersion"),
+        "ipAddress": device_info.get("ipAddress"),
+        "macAddress": device_info.get("macAddress"),
+    }
     resp = requests.post(
-        f"{api_url}/edge-devices/register",
-        json={
-            "name": name,
-            "hostname": device_info["hostname"],
-            "hardwareModel": device_info.get("model", "Unknown"),
-            "platform": device_info["platform"],
-            "macAddress": device_info.get("mac_address"),
-        },
-        headers={"Authorization": f"Bearer {auth_token}"},
+        "{}/edge-devices/register".format(api_url),
+        json=payload,
+        headers={"Authorization": "Bearer {}".format(auth_token)},
         timeout=15,
     )
     resp.raise_for_status()
@@ -150,57 +178,60 @@ def update_config(controller_id: str, api_key: str, api_url: str) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Register ANPR edge device with cloud backend")
     parser.add_argument("--api-url", required=True, help="Cloud API base URL")
+    parser.add_argument("--controller-id", required=True,
+                        help="Controller ID from cloud dashboard (must be created first)")
     parser.add_argument("--token", help="Auth token (skips login prompt)")
-    parser.add_argument("--name", help="Device name (defaults to hostname)")
     args = parser.parse_args()
 
     api_url = args.api_url.rstrip("/")
+    controller_id = args.controller_id
 
     print("ANPR Edge Device Registration")
     print("=" * 40)
 
     # Gather device info
     device_info = get_device_info()
-    device_name = args.name or device_info["hostname"]
-    print(f"\nDevice:   {device_name}")
-    print(f"Model:    {device_info.get('model', 'Unknown')}")
-    print(f"Platform: {device_info['platform']}")
-    print(f"API:      {api_url}")
+    print("\nController: {}".format(controller_id))
+    print("Hostname:   {}".format(device_info["hostname"]))
+    print("Model:      {}".format(device_info.get("model", "Unknown")))
+    print("HW Type:    {}".format(device_info["hardwareType"]))
+    print("IP:         {}".format(device_info.get("ipAddress", "unknown")))
+    print("API:        {}".format(api_url))
 
     # Authenticate
     try:
         auth_token = authenticate(api_url, args.token)
     except requests.HTTPError as e:
-        print(f"\nAuthentication failed: {e}")
+        print("\nAuthentication failed: {}".format(e))
         sys.exit(1)
 
     # Register
-    print(f"\nRegistering device '{device_name}'...")
+    print("\nRegistering device...")
     try:
-        result = register(api_url, auth_token, device_info, device_name)
+        result = register(api_url, auth_token, device_info, controller_id)
     except requests.HTTPError as e:
-        print(f"\nRegistration failed: {e}")
+        print("\nRegistration failed: {}".format(e))
         if e.response is not None:
-            print(f"Response: {e.response.text}")
+            print("Response: {}".format(e.response.text))
         sys.exit(1)
 
-    controller_id = result.get("controllerId") or result.get("id")
     api_key = result.get("apiKey")
+    returned_id = result.get("controllerId", controller_id)
 
-    if not controller_id or not api_key:
-        print(f"\nUnexpected response: {json.dumps(result, indent=2)}")
+    if not api_key:
+        print("\nUnexpected response: {}".format(json.dumps(result, indent=2)))
         sys.exit(1)
 
-    print(f"\nRegistered successfully!")
-    print(f"  Controller ID: {controller_id}")
-    print(f"  API Key:       {api_key[:12]}...")
+    print("\nRegistered successfully!")
+    print("  Controller ID: {}".format(returned_id))
+    print("  API Key:       {}...".format(api_key[:16]))
 
     # Save credentials
-    print(f"\nSaving credentials...")
-    update_config(controller_id, api_key, api_url)
+    print("\nSaving credentials...")
+    update_config(returned_id, api_key, api_url)
 
-    print(f"\nDone! Start the service with:")
-    print(f"  sudo systemctl start edge-device")
+    print("\nDone! Start the service with:")
+    print("  sudo systemctl start edge-device")
 
 
 if __name__ == "__main__":
