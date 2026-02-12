@@ -35,7 +35,7 @@ class Permit(Base):
     type = Column(String)  # RESIDENT, STAFF, VIP
     valid_from = Column(DateTime)
     valid_to = Column(DateTime, nullable=True)  # null = permanent
-    metadata = Column(JSON)
+    extra_data = Column(JSON)
     synced_at = Column(DateTime, default=_utcnow)
 
 
@@ -50,7 +50,7 @@ class GuestPass(Base):
     max_entries = Column(Integer, nullable=True)
     current_entries = Column(Integer, default=0)
     status = Column(String)  # ACTIVE, EXPIRED, REVOKED
-    metadata = Column(JSON)
+    extra_data = Column(JSON)
     synced_at = Column(DateTime, default=_utcnow)
 
 

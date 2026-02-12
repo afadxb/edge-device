@@ -186,7 +186,7 @@ class CloudSyncService:
                 'type': permit_data.get('type', 'RESIDENT'),
                 'valid_from': _parse_iso_datetime(permit_data['validFrom']) if permit_data.get('validFrom') else now,
                 'valid_to': _parse_iso_datetime(permit_data['validTo']) if permit_data.get('validTo') else None,
-                'metadata': permit_data.get('metadata'),
+                'extra_data': permit_data.get('metadata'),
                 'synced_at': now,
             })
 
@@ -200,7 +200,7 @@ class CloudSyncService:
                 'max_entries': gp_data.get('maxEntries'),
                 'current_entries': gp_data.get('currentEntries', 0),
                 'status': gp_data.get('status', 'ACTIVE'),
-                'metadata': gp_data.get('metadata'),
+                'extra_data': gp_data.get('metadata'),
                 'synced_at': now,
             })
 
