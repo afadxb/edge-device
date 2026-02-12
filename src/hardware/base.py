@@ -57,6 +57,21 @@ class HardwareInterface(ABC):
         """Get CPU temperature in Celsius"""
         pass
 
+    @abstractmethod
+    def get_gpu_temp(self) -> Optional[float]:
+        """Get GPU temperature in Celsius"""
+        pass
+
+    @abstractmethod
+    def get_cpu_usage(self) -> Optional[float]:
+        """Get CPU usage percentage (0-100)"""
+        pass
+
+    @abstractmethod
+    def get_platform_version(self) -> Optional[str]:
+        """Get platform/OS version string (e.g. JetPack version)"""
+        pass
+
     def is_initialized(self) -> bool:
         """Check if hardware is initialized"""
         return self._initialized

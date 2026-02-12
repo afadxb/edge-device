@@ -104,6 +104,8 @@ class HeartbeatService:
         # System metrics
         memory_usage = self._get_memory_usage()
         cpu_temp = self._get_cpu_temp()
+        gpu_temp = self._get_gpu_temp()
+        cpu_usage = self._get_cpu_usage()
         disk_space_mb = self._get_disk_space_mb()
 
         # Hardware health
@@ -112,6 +114,10 @@ class HeartbeatService:
 
         # Queue depth
         sqlite_queue_depth = self.repo.get_queued_events_count()
+
+        # Platform info
+        software_version = self._get_software_version()
+        platform_version = self._get_platform_version()
 
         # Determine overall status
         status = self._determine_status(
@@ -138,6 +144,15 @@ class HeartbeatService:
             'streamHealth': stream_health,
             'sqliteQueueDepth': sqlite_queue_depth,
         }
+
+        if gpu_temp is not None:
+            telemetry['gpuTemp'] = gpu_temp
+        if cpu_usage is not None:
+            telemetry['cpuUsage'] = cpu_usage
+        if software_version:
+            telemetry['softwareVersion'] = software_version
+        if platform_version:
+            telemetry['platformVersion'] = platform_version
 
         if self.last_plate_seen:
             telemetry['lastPlateSeen'] = self.last_plate_seen.isoformat() + 'Z'
@@ -203,6 +218,37 @@ class HeartbeatService:
         try:
             if self.hardware:
                 return self.hardware.get_cpu_temp()
+        except Exception:
+            pass
+        return None
+
+    def _get_gpu_temp(self) -> Optional[float]:
+        """Get GPU temperature using hardware interface"""
+        try:
+            if self.hardware:
+                return self.hardware.get_gpu_temp()
+        except Exception:
+            pass
+        return None
+
+    def _get_cpu_usage(self) -> Optional[float]:
+        """Get CPU usage percentage using hardware interface"""
+        try:
+            if self.hardware:
+                return self.hardware.get_cpu_usage()
+        except Exception:
+            pass
+        return None
+
+    def _get_software_version(self) -> str:
+        """Get edge device software version"""
+        return '1.0.0'
+
+    def _get_platform_version(self) -> Optional[str]:
+        """Get platform/OS version (e.g. JetPack version)"""
+        try:
+            if self.hardware:
+                return self.hardware.get_platform_version()
         except Exception:
             pass
         return None
