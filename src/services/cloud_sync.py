@@ -18,6 +18,40 @@ from database.repository import Repository
 
 logger = logging.getLogger(__name__)
 
+
+def _parse_iso_datetime(s):
+    """Parse ISO 8601 datetime string (Python 3.6 compatible)"""
+    if s is None:
+        return None
+    s = s.replace('Z', '+00:00')
+    # Strip fractional seconds for simplicity (strptime %f requires exactly 6 digits)
+    # Handle formats: 2024-01-15T10:30:00+00:00 or 2024-01-15T10:30:00.123456+00:00
+    if '.' in s:
+        base, rest = s.split('.', 1)
+        # rest is like "123456+00:00" or "123+00:00"
+        if '+' in rest:
+            _, tz = rest.split('+', 1)
+            s = base + '+' + tz
+        elif rest.count('-') >= 1:
+            # Negative timezone offset like .123-05:00
+            parts = rest.rsplit('-', 1)
+            s = base + '-' + parts[-1]
+        else:
+            s = base
+    # Now s is like "2024-01-15T10:30:00+00:00"
+    # Python 3.6 strptime doesn't support colon in timezone offset, remove it
+    if s[-3] == ':' and (s[-6] == '+' or s[-6] == '-'):
+        s = s[:-3] + s[-2:]
+    try:
+        return datetime.strptime(s, '%Y-%m-%dT%H:%M:%S%z')
+    except ValueError:
+        # Fallback: try without timezone
+        try:
+            return datetime.strptime(s.split('+')[0].split('-')[0], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
+        except ValueError:
+            logger.error(f"Could not parse datetime: {s}")
+            return datetime.now(timezone.utc)
+
 MAX_EVENT_RETRIES = 10
 
 
@@ -150,8 +184,8 @@ class CloudSyncService:
                 'id': permit_data['id'],
                 'plate': permit_data['plate'],
                 'type': permit_data.get('type', 'RESIDENT'),
-                'valid_from': datetime.fromisoformat(permit_data['validFrom'].replace('Z', '+00:00')) if permit_data.get('validFrom') else now,
-                'valid_to': datetime.fromisoformat(permit_data['validTo'].replace('Z', '+00:00')) if permit_data.get('validTo') else None,
+                'valid_from': _parse_iso_datetime(permit_data['validFrom']) if permit_data.get('validFrom') else now,
+                'valid_to': _parse_iso_datetime(permit_data['validTo']) if permit_data.get('validTo') else None,
                 'metadata': permit_data.get('metadata'),
                 'synced_at': now,
             })
@@ -161,8 +195,8 @@ class CloudSyncService:
             self.repo.upsert_guest_pass({
                 'id': gp_data['id'],
                 'plate': gp_data['plate'],
-                'valid_from': datetime.fromisoformat(gp_data['validFrom'].replace('Z', '+00:00')),
-                'valid_to': datetime.fromisoformat(gp_data['validTo'].replace('Z', '+00:00')),
+                'valid_from': _parse_iso_datetime(gp_data['validFrom']),
+                'valid_to': _parse_iso_datetime(gp_data['validTo']),
                 'max_entries': gp_data.get('maxEntries'),
                 'current_entries': gp_data.get('currentEntries', 0),
                 'status': gp_data.get('status', 'ACTIVE'),

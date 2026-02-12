@@ -7,7 +7,7 @@ set -euo pipefail
 
 INSTALL_DIR="/opt/edge-device"
 SERVICE_USER="anpr"
-PYTHON_MIN="3.10"
+PYTHON_MIN="3.6"
 VENV_DIR="${INSTALL_DIR}/venv"
 
 RED='\033[0;31m'
@@ -75,12 +75,16 @@ apt-get install -y --no-install-recommends \
     python3-pip \
     python3-venv \
     python3-dev \
+    python3-setuptools \
     gcc \
     docker.io \
     docker-compose \
     nvidia-container-toolkit \
     curl \
     sqlite3
+
+# Ensure pip build tools are available system-wide
+pip3 install --upgrade pip setuptools wheel 2>/dev/null || true
 
 # Check Python version
 PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")

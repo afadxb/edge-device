@@ -11,12 +11,15 @@ Event Decision Taxonomy:
 - EXIT_LOG: Exit lane logging (no gate control)
 """
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Float, Integer, Boolean, DateTime, JSON, Text
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import Column, String, Float, Integer, Boolean, DateTime, Text
+from sqlalchemy.ext.declarative import declarative_base
 
+try:
+    from sqlalchemy import JSON
+except ImportError:
+    from sqlalchemy import Text as JSON
 
-class Base(DeclarativeBase):
-    pass
+Base = declarative_base()
 
 
 def _utcnow():

@@ -1,6 +1,6 @@
 # Web Framework (Python 3.6 compatible - Jetson Nano / JetPack 4.6)
 fastapi==0.83.0
-uvicorn==0.17.6
+uvicorn==0.17.0
 
 # Database (1.4.x is last branch supporting Python 3.6)
 sqlalchemy==1.4.52
@@ -14,3 +14,6 @@ requests==2.27.1
 
 # Configuration
 pyyaml==6.0.1
+
+# Python 3.6 backports
+dataclasses;python_version<"3.7"
