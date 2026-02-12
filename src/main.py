@@ -33,7 +33,13 @@ logger = logging.getLogger(__name__)
 
 def setup_logging(level: str, log_file: str) -> None:
     """Configure logging for the application"""
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    # Resolve relative paths against the install directory (one level up from src/)
+    if not os.path.isabs(log_file):
+        install_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        log_file = os.path.join(install_dir, log_file)
+    log_dir = os.path.dirname(log_file)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
 
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
@@ -64,9 +70,16 @@ def main() -> None:
         logger.error("EDGE_API_KEY is required. Set in config.yaml or env var.")
         sys.exit(1)
 
-    # Initialize database
-    os.makedirs(os.path.dirname(settings.database.path), exist_ok=True)
-    repo = Repository(database_url=settings.database.url)
+    # Initialize database (resolve relative path against install dir)
+    db_path = settings.database.path
+    if not os.path.isabs(db_path):
+        install_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        db_path = os.path.join(install_dir, db_path)
+    db_dir = os.path.dirname(db_path)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+    db_url = 'sqlite:///' + db_path
+    repo = Repository(database_url=db_url)
     logger.info("Database initialized")
 
     # Initialize hardware

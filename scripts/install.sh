@@ -199,10 +199,7 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=edge-device
 
-# Security hardening
-NoNewPrivileges=false
-ProtectSystem=strict
-ReadWritePaths=${INSTALL_DIR}/data ${INSTALL_DIR}/logs
+# GPIO access requires /sys and /dev, so no ProtectSystem=strict
 SupplementaryGroups=gpio docker
 
 [Install]
