@@ -1,0 +1,29 @@
+[Unit]
+Description=ANPR Edge Device
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=anpr
+Group=anpr
+WorkingDirectory=/opt/edge-device/src
+Environment=PATH=/opt/edge-device/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=EDGE_CONFIG_PATH=/opt/edge-device/config/config.yaml
+EnvironmentFile=-/opt/edge-device/.env
+ExecStart=/opt/edge-device/venv/bin/python -m main
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=edge-device
+
+# Security hardening
+NoNewPrivileges=false
+ProtectSystem=strict
+ReadWritePaths=/opt/edge-device/data /opt/edge-device/logs
+SupplementaryGroups=gpio docker
+
+[Install]
+WantedBy=multi-user.target

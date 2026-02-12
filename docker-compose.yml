@@ -1,0 +1,65 @@
+# Docker Compose for ANPR Edge Device (NVIDIA Jetson Nano)
+# Runs Plate Recognizer Stream (on-premise) alongside the edge device controller.
+#
+# Plate Recognizer Stream processes RTSP camera feeds locally using GPU
+# and sends plate detection webhooks to the edge device's FastAPI endpoint.
+#
+# Jetson images by JetPack version:
+#   JetPack 4.6.x (R32): platerecognizer/alpr-jetson:latest
+#   JetPack 5.x   (R35): platerecognizer/alpr-jetson:r35
+#   JetPack 6.x   (R36): platerecognizer/alpr-jetson:r36
+#
+# Docs: https://guides.platerecognizer.com/docs/snapshot/manual-install/
+
+services:
+  # ============================================================
+  # Plate Recognizer Stream (On-Premise, GPU-accelerated)
+  # Processes RTSP video feeds → plate detections → webhook POST
+  # License is tied to device hardware fingerprint.
+  # ============================================================
+  stream:
+    image: platerecognizer/alpr-jetson:${JETPACK_TAG:-latest}
+    container_name: anpr-stream
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - TOKEN=${PLATE_RECOGNIZER_TOKEN}
+      - LICENSE_KEY=${PLATE_RECOGNIZER_LICENSE_KEY}
+    volumes:
+      - stream-data:/user-data
+    network_mode: host
+    # Host networking: Stream needs RTSP camera access on LAN
+    # and sends webhooks to localhost:8001
+
+  # ============================================================
+  # Edge Device Controller
+  # FastAPI webhook receiver + access control + cloud sync
+  # ============================================================
+  controller:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: edge-device
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - EDGE_CONTROLLER_ID=${EDGE_CONTROLLER_ID}
+      - EDGE_API_KEY=${EDGE_API_KEY}
+      - EDGE_API_URL=${EDGE_API_URL:-https://api.anpr.cloud}
+      - EDGE_WEBHOOK_PORT=8001
+      - EDGE_DB_PATH=/data/edge.db
+    volumes:
+      - ./config:/app/config:ro
+      - controller-data:/data
+      - controller-logs:/app/logs
+    network_mode: host
+    privileged: true
+    # Required for GPIO pin access on Jetson Nano
+    devices:
+      - /dev/gpiomem:/dev/gpiomem
+
+volumes:
+  stream-data:
+  controller-data:
+  controller-logs:

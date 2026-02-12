@@ -1,0 +1,50 @@
+# ANPR Edge Device Controller Configuration
+# Copy to config.yaml and fill in values
+
+device:
+  # Controller ID from cloud backend (set during registration)
+  controller_id: ""
+  # API key (generated during registration - do not edit manually)
+  api_key: ""
+
+api:
+  # Cloud backend base URL
+  base_url: "https://api.example.com"
+  # Request timeout in seconds
+  timeout: 10
+
+gpio:
+  # GPIO pin number for relay control
+  relay_pin: 18
+  # Relay pulse duration in seconds (how long gate stays open)
+  pulse_duration: 5.0
+  # Whether relay is active-high (true) or active-low (false)
+  active_high: true
+
+stream:
+  # Local port for Plate Recognizer Stream webhook
+  webhook_port: 8001
+  # Webhook endpoint path
+  webhook_path: "/v1/webhook/stream"
+  # Timeout before stream is considered unhealthy (seconds)
+  health_timeout: 120
+
+sync:
+  # Heartbeat interval in seconds
+  heartbeat_interval: 60
+  # Configuration sync interval in seconds
+  config_sync_interval: 300
+  # Event upload batch size
+  event_batch_size: 50
+  # Event upload interval in seconds
+  event_upload_interval: 10
+
+database:
+  # SQLite database path
+  path: "data/edge.db"
+
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
+  # Log file path (empty for stdout only)
+  file: "logs/edge-controller.log"

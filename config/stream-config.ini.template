@@ -1,0 +1,31 @@
+; Plate Recognizer Stream On-Premise Configuration
+; Docs: https://guides.platerecognizer.com/docs/stream/configuration/
+;
+; This is a TEMPLATE. On first run, Stream auto-generates config.ini
+; in the /user-data volume. Edit that file directly, then restart Stream.
+;
+; Alternatively, configure via the dashboard at app.platerecognizer.com
+; (dashboard changes overwrite local config.ini edits).
+
+[cameras]
+  ; Global settings applied to all cameras
+  regions = us
+
+  ; Entry camera
+  [[camera-entry-1]]
+    url = rtsp://USER:PASSWORD@192.168.1.100:554/stream
+    active = yes
+    name = Entry Camera
+
+  ; Exit camera (if applicable)
+  ; [[camera-exit-1]]
+  ;   url = rtsp://USER:PASSWORD@192.168.1.101:554/stream
+  ;   active = yes
+  ;   name = Exit Camera
+
+[webhooks]
+  ; Webhook to local edge controller
+  [[edge-controller]]
+    url = http://localhost:8001/v1/webhook/stream
+    image = no
+    request_timeout = 10
