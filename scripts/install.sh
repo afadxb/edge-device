@@ -111,6 +111,7 @@ if [[ -f "${SCRIPT_DIR}/requirements.txt" ]]; then
     cp "${SCRIPT_DIR}/requirements.txt" "${INSTALL_DIR}/"
     cp "${SCRIPT_DIR}/docker-compose.yml" "${INSTALL_DIR}/"
     cp "${SCRIPT_DIR}/Dockerfile" "${INSTALL_DIR}/"
+    cp -r "${SCRIPT_DIR}/scripts" "${INSTALL_DIR}/"
 fi
 
 # ── Python virtual environment ─────────────────────────────────
@@ -143,14 +144,41 @@ if [[ ! -f "${INSTALL_DIR}/.env" ]]; then
     fi
 fi
 
-# ── Systemd service ────────────────────────────────────────────
-log "Installing systemd service..."
+# ── Systemd services ──────────────────────────────────────────
+
+# 1) Plate Recognizer Stream (Docker container, GPU-accelerated)
+log "Installing anpr-stream systemd service..."
+cat > /etc/systemd/system/anpr-stream.service << EOF
+[Unit]
+Description=Plate Recognizer Stream (On-Premise)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=-${INSTALL_DIR}/.env
+ExecStartPre=/usr/bin/docker compose pull --quiet stream
+ExecStart=/usr/bin/docker compose up stream
+ExecStop=/usr/bin/docker compose down stream
+Restart=on-failure
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=anpr-stream
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 2) Edge Device Controller (runs directly for GPIO access)
+log "Installing edge-device systemd service..."
 cat > /etc/systemd/system/edge-device.service << EOF
 [Unit]
-Description=ANPR Edge Device
-After=network-online.target docker.service
-Wants=network-online.target
-Requires=docker.service
+Description=ANPR Edge Device Controller
+After=network-online.target anpr-stream.service
+Wants=network-online.target anpr-stream.service
 
 [Service]
 Type=simple
@@ -192,20 +220,16 @@ log "=============================="
 log ""
 log "Next steps:"
 log "  1. Edit configuration:"
-log "     sudo nano ${INSTALL_DIR}/config/config.yaml"
 log "     sudo nano ${INSTALL_DIR}/.env"
+log "     sudo nano ${INSTALL_DIR}/config/config.yaml"
 log ""
 log "  2. Register this device with the cloud API:"
 log "     sudo ${VENV_DIR}/bin/python ${INSTALL_DIR}/scripts/register_device.py \\"
-log "       --api-url https://api.anpr.cloud"
+log "       --api-url http://<cloud-ip>:3000 --controller-id <id>"
 log ""
-log "  3. Start Plate Recognizer Stream:"
-log "     cd ${INSTALL_DIR} && docker-compose up -d stream"
+log "  3. Start services:"
+log "     sudo systemctl enable --now anpr-stream edge-device"
 log ""
-log "  4. Start the edge device:"
-log "     sudo systemctl start edge-device"
-log "     sudo systemctl enable edge-device"
-log ""
-log "  5. Check status:"
-log "     sudo systemctl status edge-device"
+log "  4. Check status:"
+log "     sudo systemctl status anpr-stream edge-device"
 log "     sudo journalctl -u edge-device -f"
